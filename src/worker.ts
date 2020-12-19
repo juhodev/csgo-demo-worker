@@ -3,7 +3,7 @@ import { logger } from '.';
 import { Match } from './steam/types';
 
 async function registerWorker() {
-	const { MASTER_SERVER_URL, DEMO_WORKER_PASSWORD } = process.env;
+	const { MASTER_SERVER_URL, DEMO_WORKER_PASSWORD, WORKER_ADDRESS } = process.env;
 	logger.info('Registering worker');
 
 	const response = await fetch(`${MASTER_SERVER_URL}/api/demoworker/worker`, {
@@ -13,7 +13,7 @@ async function registerWorker() {
 		},
 		body: JSON.stringify({
 			password: DEMO_WORKER_PASSWORD,
-			address: 'http://192.168.1.236:8080',
+			address: WORKER_ADDRESS,
 		}),
 	});
 
