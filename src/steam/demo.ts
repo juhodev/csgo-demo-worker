@@ -60,15 +60,15 @@ class Demo {
 			return;
 		}
 
-		// If the player rejoins the game this event will still get called
-		// even if the player entity is already in the `players` array.
-		// Ignore the player if it's already in the `players` array.
-		const playerAlreadyExists: boolean = this.players.some(
-			(p) => p.userInfo.friendsId === entity.userInfo.friendsId,
+		// If the player already exists in the `players` array we should
+		// remove it and update it with the new player entity that just joined.
+		// This happens when a player leaves and rejoins the game.
+		const playerIndex: number = this.players.findIndex(
+			(p) => p.steam64Id === entity.steam64Id,
 		);
 
-		if (playerAlreadyExists) {
-			return;
+		if (playerIndex !== -1) {
+			this.players.splice(playerIndex, 1);
 		}
 
 		this.players.push(entity);
