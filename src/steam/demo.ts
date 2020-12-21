@@ -2,7 +2,7 @@ import * as demofile from 'demofile';
 import * as fs from 'fs';
 import { logger } from '..';
 import { saveProcessTime } from '../metrics/db';
-import { Match, Player, Team } from './types';
+import { Match, Player, PlayerIdentity, Team } from './types';
 import { changeMapName } from './utils';
 
 class Demo {
@@ -10,6 +10,7 @@ class Demo {
 	private players: demofile.Player[];
 	private demoFile: demofile.DemoFile;
 	private matchTime: number;
+	private playerIdentities: Map<string, PlayerIdentity>;
 
 	private processStart: number;
 
@@ -17,6 +18,7 @@ class Demo {
 		this.demoFilePath = demoFilePath;
 		this.players = [];
 		this.matchTime = matchTime;
+		this.playerIdentities = new Map();
 
 		this.onEntityCreate = this.onEntityCreate.bind(this);
 		this.onError = this.onError.bind(this);
@@ -72,6 +74,11 @@ class Demo {
 		}
 
 		this.players.push(entity);
+		this.playerIdentities.set(entity.steam64Id, {
+			name: entity.userInfo.name,
+			steamId3: entity.userInfo.friendsId,
+			steamId64: entity.steam64Id,
+		});
 	}
 
 	private onError(error: any, reject: (reason: any) => void) {
@@ -126,9 +133,13 @@ class Demo {
 		};
 
 		for (const playerEntity of this.players) {
+			const identity: PlayerIdentity = this.playerIdentities.get(
+				playerEntity.steam64Id,
+			);
+
 			const player: Player = {
-				name: playerEntity.userInfo.name,
-				steamId3: playerEntity.userInfo.friendsId.toString(),
+				name: identity.name,
+				steamId3: identity.steamId3.toString(),
 				steamId64: playerEntity.steam64Id,
 				assists: playerEntity.assists,
 				deaths: playerEntity.deaths,

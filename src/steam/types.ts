@@ -77,3 +77,9 @@ export type Player = {
 	side: string;
 	score: number;
 };
+
+export type PlayerIdentity = {
+	name: string;
+	steamId3: number;
+	steamId64: string;
+};
