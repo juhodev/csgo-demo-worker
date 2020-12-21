@@ -6,6 +6,7 @@ import startApi from './api/server';
 import Downloader from './downloader';
 import * as fs from 'fs';
 import { registerWorker } from './worker';
+import Timer from './timer';
 
 const logger = winston.createLogger({
 	level: 'debug',
@@ -30,8 +31,9 @@ if (!fs.existsSync('data/demos')) {
 }
 
 const downloader: Downloader = new Downloader();
+const timer: Timer = new Timer();
 
 startApi();
 registerWorker();
 
-export { logger, downloader };
+export { logger, downloader, timer };

@@ -7,6 +7,7 @@ import * as path from 'path';
 import AccountRouter from './routes/accountRoute';
 import DemoRouter from './routes/demoRoute';
 import HealthRouter from './routes/healthRoute';
+import MetricsRouter from './routes/metricsRoute';
 
 function startApi() {
 	const app = express();
@@ -17,6 +18,7 @@ function startApi() {
 	app.use('/account', AccountRouter);
 	app.use('/demo', DemoRouter);
 	app.use('/health', HealthRouter);
+	app.use('/metrics', MetricsRouter);
 
 	app.listen(process.env.HTTP_PORT, () => {
 		console.log(`API listening on port ${process.env.HTTP_PORT}`);

@@ -1,4 +1,4 @@
-import { logger } from '.';
+import { logger, timer } from '.';
 import Csgo from './steam/csgo';
 import {
 	LoginDetails,
@@ -69,6 +69,7 @@ class Downloader {
 		}
 
 		this.working = true;
+		timer.start('demo');
 
 		const sharingCode: string = this.downloadQueue.shift();
 		// TODO: Check if a demo with this code has already been downloaded

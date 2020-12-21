@@ -1,6 +1,6 @@
 import * as demofile from 'demofile';
 import * as fs from 'fs';
-import { logger } from '..';
+import { logger, timer } from '..';
 import { saveProcessTime } from '../metrics/db';
 import { Match, Player, PlayerIdentity, Team } from './types';
 import { changeMapName } from './utils';
@@ -11,8 +11,6 @@ class Demo {
 	private demoFile: demofile.DemoFile;
 	private matchTime: number;
 	private playerIdentities: Map<string, PlayerIdentity>;
-
-	private processStart: number;
 
 	constructor(demoFilePath: string, matchTime: number) {
 		this.demoFilePath = demoFilePath;
@@ -27,7 +25,6 @@ class Demo {
 
 	async process(): Promise<Match> {
 		return new Promise((resolve, reject) => {
-			this.processStart = new Date().getTime();
 			logger.debug(`Processing demo ${this.demoFilePath}`);
 			this.createDemoFile(resolve, reject);
 
@@ -90,7 +87,7 @@ class Demo {
 		reject(error);
 	}
 
-	private onEnd(resolve: (match: Match) => void) {
+	private async onEnd(resolve: (match: Match) => void) {
 		const tRounds: number = this.demoFile.teams.find(
 			(team) => team.teamName === 'TERRORIST',
 		)?.score;
@@ -178,8 +175,8 @@ class Demo {
 		};
 
 		const currentTime: number = new Date().getTime();
-		const processingTime: number = currentTime - this.processStart;
-		saveProcessTime(currentTime, processingTime, this.demoFilePath);
+		const processingTime: number = timer.end('demo');
+		await saveProcessTime(currentTime, processingTime, this.demoFilePath);
 
 		logger.debug('Demo processed!');
 		resolve(match);
