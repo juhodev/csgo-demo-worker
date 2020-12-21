@@ -74,6 +74,10 @@ class Demo {
 		}
 
 		this.players.push(entity);
+
+		// I need to keep track of the player names and ids separately because
+		// when a player leaves at the end of the game, their name and steamid3 is replaced
+		// with a bot but their steamid64 stays the same.
 		this.playerIdentities.set(entity.steam64Id, {
 			name: entity.userInfo.name,
 			steamId3: entity.userInfo.friendsId,
@@ -133,6 +137,9 @@ class Demo {
 		};
 
 		for (const playerEntity of this.players) {
+			// Get the player identity from the ones that are saved when the entity is created. Sometimes
+			// the player's name and steamid3 is replaced with ones from a bot. Their steamid64 always stays the
+			// same.
 			const identity: PlayerIdentity = this.playerIdentities.get(
 				playerEntity.steam64Id,
 			);
