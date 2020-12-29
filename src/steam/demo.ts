@@ -1,8 +1,29 @@
 import * as demofile from 'demofile';
+import {
+	IEventBombPlanted,
+	IEventItemPickup,
+	IEventPlayerBlind,
+	IEventPlayerFalldamage,
+	IEventPlayerFootstep,
+	IEventPlayerHurt,
+	IEventPlayerJump,
+	IEventWeaponFire,
+	IEventWeaponReload,
+	IEventWeaponZoom,
+} from 'demofile';
 import * as fs from 'fs';
 import { logger, timer } from '..';
 import { saveProcessTime } from '../metrics/db';
-import { Match, Player, PlayerIdentity, Team } from './types';
+import {
+	DamageTaken,
+	ItemPickup,
+	Match,
+	Player,
+	PlayerIdentity,
+	Team,
+	UnnecessaryStats,
+	WeaponFire,
+} from './types';
 import { changeMapName } from './utils';
 
 class Demo {
@@ -11,16 +32,29 @@ class Demo {
 	private demoFile: demofile.DemoFile;
 	private matchTime: number;
 	private playerIdentities: Map<string, PlayerIdentity>;
+	// This'll contain stats that no one really needs but I want to save
+	private unnecessaryStats: Map<number, UnnecessaryStats>;
 
 	constructor(demoFilePath: string, matchTime: number) {
 		this.demoFilePath = demoFilePath;
 		this.players = [];
 		this.matchTime = matchTime;
 		this.playerIdentities = new Map();
+		this.unnecessaryStats = new Map();
 
 		this.onEntityCreate = this.onEntityCreate.bind(this);
 		this.onError = this.onError.bind(this);
 		this.onEnd = this.onEnd.bind(this);
+		this.onPlayerJump = this.onPlayerJump.bind(this);
+		this.onPlayerFallDamage = this.onPlayerFallDamage.bind(this);
+		this.onWeaponFire = this.onWeaponFire.bind(this);
+		this.onWeaponZoom = this.onWeaponZoom.bind(this);
+		this.onPlayerHurt = this.onPlayerHurt.bind(this);
+		this.onPlayerBlind = this.onPlayerBlind.bind(this);
+		this.onItemPickup = this.onItemPickup.bind(this);
+		this.onWeaponReload = this.onWeaponReload.bind(this);
+		this.onPlayerFootstep = this.onPlayerFootstep.bind(this);
+		this.onBombPlant = this.onBombPlant.bind(this);
 	}
 
 	async process(): Promise<Match> {
@@ -41,8 +75,144 @@ class Demo {
 
 		this.demoFile.entities.on('create', this.onEntityCreate);
 
+		this.demoFile.gameEvents.on('player_jump', this.onPlayerJump);
+		this.demoFile.gameEvents.on(
+			'player_falldamage',
+			this.onPlayerFallDamage,
+		);
+		this.demoFile.gameEvents.on('weapon_fire', this.onWeaponFire);
+		this.demoFile.gameEvents.on('weapon_zoom', this.onWeaponZoom);
+		this.demoFile.gameEvents.on('player_hurt', this.onPlayerHurt);
+		this.demoFile.gameEvents.on('player_blind', this.onPlayerBlind);
+		this.demoFile.gameEvents.on('item_pickup', this.onItemPickup);
+		this.demoFile.gameEvents.on('weapon_reload', this.onWeaponReload);
+		this.demoFile.gameEvents.on('player_footstep', this.onPlayerFootstep);
+		this.demoFile.gameEvents.on('bomb_planted', this.onBombPlant);
+
 		this.demoFile.on('error', (e) => this.onError(e, reject));
 		this.demoFile.on('end', () => this.onEnd(resolve));
+	}
+
+	private onPlayerJump(event: IEventPlayerJump) {
+		const { userid } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		stats.jumps++;
+	}
+
+	private onBombPlant(event: IEventBombPlanted) {
+		const { userid } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		stats.bombPlants++;
+	}
+
+	private onPlayerFallDamage(event: IEventPlayerFalldamage) {
+		const { damage, userid } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		stats.fallDamage += damage;
+	}
+
+	private onWeaponFire(event: IEventWeaponFire) {
+		const { weapon, userid } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		let weaponFire: WeaponFire = stats.weaponFire.find(
+			(x) => x.weapon === weapon,
+		);
+		if (weaponFire === undefined) {
+			weaponFire = { count: 0, weapon };
+			stats.weaponFire.push(weaponFire);
+		}
+
+		weaponFire.count++;
+		stats.weaponFire;
+	}
+
+	private onWeaponZoom(event: IEventWeaponZoom) {
+		const { userid } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		stats.weaponZooms++;
+	}
+
+	private onPlayerFootstep(event: IEventPlayerFootstep) {
+		const { userid } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		stats.footsteps++;
+	}
+
+	private onWeaponReload(event: IEventWeaponReload) {
+		const { userid } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		stats.reloads++;
+	}
+
+	private onItemPickup(event: IEventItemPickup) {
+		const { userid, item, silent } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		let itemPickup: ItemPickup = stats.itemPickup.find(
+			(x) => x.item === item,
+		);
+		if (itemPickup === undefined) {
+			itemPickup = { count: 0, item, silent: 0 };
+			stats.itemPickup.push(itemPickup);
+		}
+
+		itemPickup.count++;
+		if (silent) {
+			itemPickup.silent++;
+		}
+	}
+
+	private onPlayerBlind(event: IEventPlayerBlind) {
+		const { userid, blind_duration } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		stats.blind.duration += blind_duration;
+		stats.blind.times++;
+	}
+
+	private onPlayerHurt(event: IEventPlayerHurt) {
+		const { userid, dmg_health, weapon } = event;
+		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
+
+		let damageTaken: DamageTaken = stats.damageTaken.find(
+			(x) => x.weapon === weapon,
+		);
+		if (damageTaken === undefined) {
+			damageTaken = { amount: 0, weapon };
+			stats.damageTaken.push(damageTaken);
+		}
+
+		damageTaken.amount += dmg_health;
+		stats.weaponFire;
+	}
+
+	private getUnnecessaryStats(userid: number): UnnecessaryStats {
+		if (!this.unnecessaryStats.has(userid)) {
+			this.unnecessaryStats.set(userid, {
+				jumps: 0,
+				fallDamage: 0,
+				weaponFire: [],
+				weaponZooms: 0,
+				damageTaken: [],
+				blind: {
+					duration: 0,
+					times: 0,
+				},
+				footsteps: 0,
+				itemPickup: [],
+				reloads: 0,
+				bombPlants: 0,
+			});
+		}
+
+		return this.unnecessaryStats.get(userid);
 	}
 
 	private onEntityCreate(event: demofile.IEntityCreationEvent) {
@@ -159,6 +329,9 @@ class Demo {
 						100,
 				),
 				score: playerEntity.score,
+				unnecessaryStats: this.unnecessaryStats.get(
+					playerEntity.userId,
+				),
 			};
 
 			teams[player.side].players.push(player);

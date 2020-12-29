@@ -1,3 +1,5 @@
+import { Weapon } from 'demofile';
+
 export type LoginDetails = {
 	account_name: string;
 	password: string;
@@ -76,10 +78,45 @@ export type Player = {
 	ping: number;
 	side: string;
 	score: number;
+	unnecessaryStats: UnnecessaryStats;
 };
 
 export type PlayerIdentity = {
 	name: string;
 	steamId3: number;
 	steamId64: string;
+};
+
+export type UnnecessaryStats = {
+	jumps: number;
+	fallDamage: number;
+	weaponFire: WeaponFire[];
+	weaponZooms: number;
+	damageTaken: DamageTaken[];
+	blind: Blind;
+	itemPickup: ItemPickup[];
+	reloads: number;
+	footsteps: number;
+	bombPlants: number;
+};
+
+export type WeaponFire = {
+	weapon: string;
+	count: number;
+};
+
+export type DamageTaken = {
+	weapon: string;
+	amount: number;
+};
+
+export type Blind = {
+	times: number;
+	duration: number;
+};
+
+export type ItemPickup = {
+	item: string;
+	count: number;
+	silent: number;
 };
