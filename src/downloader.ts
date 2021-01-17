@@ -106,6 +106,7 @@ class Downloader {
 			logger.error('demoFilePath is undefined');
 			// If the match couldn't be downloaded then I still need to send a update to the master to get a new job
 			sendMatchToMaster(undefined);
+			this.working = false;
 			return;
 		}
 
