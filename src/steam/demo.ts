@@ -57,6 +57,9 @@ class Demo {
 		this.onBombPlant = this.onBombPlant.bind(this);
 	}
 
+	// TODO: Divide the map into squares and use those squares to draw a heatmap
+	// of some sorts. There's no point in doing it pixel by pixel (or well coordinate by coordinate or whatever the fuck)
+
 	async process(): Promise<Match> {
 		return new Promise((resolve, reject) => {
 			logger.debug(`Processing demo ${this.demoFilePath}`);

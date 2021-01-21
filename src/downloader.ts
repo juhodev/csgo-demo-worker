@@ -19,6 +19,11 @@ import { sendMatchToMaster } from './worker';
 
 const streamPipeline = util.promisify(require('stream').pipeline);
 
+// Maximum count of relogin fails in a row. After this the client will not
+// try to relogin in `RELOGIN_COOLDOWN` amount of time.
+const MAX_RELOGIN_FAILS: number = 5;
+const RELOGIN_COOLDOWN: number = 1000 * 60 * 60;
+
 class Downloader {
 	private csgo: Csgo;
 
@@ -26,11 +31,20 @@ class Downloader {
 	private downloadQueue: string[];
 	private initialized: boolean;
 
+	/**
+	 * Tracks how many relogin attemps have been made without success
+	 */
+	private reloginAttempts: number;
+	private lastFailedRelogin: Date;
+
 	constructor() {
 		this.csgo = new Csgo();
 		this.working = false;
 		this.downloadQueue = [];
 		this.initialized = false;
+
+		this.reloginAttempts = 0;
+		this.lastFailedRelogin = new Date(-1);
 	}
 
 	async init(loginDetails: LoginDetails) {
@@ -55,6 +69,13 @@ class Downloader {
 	}
 
 	private async download() {
+		// If steam has received an error and disconnected I want to try
+		// to login again
+		if (this.csgo.getLoginState() === LoginState.LOGIN_ERROR) {
+			await this.attemptRelogin();
+			return;
+		}
+
 		// We don't want to proceed with downloading in three cases:
 		// 1. We're already downloading a demo
 		// 2. The csgo client hasn't launched yet, when the client is ready it'll start
@@ -121,6 +142,42 @@ class Downloader {
 		logger.debug(JSON.stringify(demoMatch));
 		this.working = false;
 		sendMatchToMaster(demoMatch);
+	}
+
+	/**
+	 * Attempts to relogin to steam.
+	 *
+	 * If there have already been too many attempts
+	 * this will set a temporary cooldown to login attempts.
+	 */
+	private async attemptRelogin() {
+		// Check if there have already been too many relogin attempts.
+		if (this.reloginAttempts > MAX_RELOGIN_FAILS) {
+			const currentTime: Date = new Date();
+			const elapsedTime: number =
+				currentTime.getTime() - this.lastFailedRelogin.getTime();
+
+			// If enough time hasn't yet elapsed since the last failed login attemps
+			// then I just return here and don't do anything more.
+			if (elapsedTime < RELOGIN_COOLDOWN) {
+				return;
+			}
+
+			// If enough time has elapsed then I reset the reloginAttemps to zero and
+			// try to login again.
+			this.reloginAttempts = 0;
+		}
+
+		await this.csgo.reLogin();
+		if (this.csgo.getLoginState() != LoginState.CSGO_READY) {
+			// If the login failed again then I want to increment the reloginAttemps and
+			// call download() again in one minute
+			this.reloginAttempts++;
+			this.lastFailedRelogin = new Date();
+			setTimeout(() => {
+				this.download();
+			}, 1000 * 60);
+		}
 	}
 
 	/**

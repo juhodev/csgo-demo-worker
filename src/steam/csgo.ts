@@ -103,6 +103,11 @@ class Csgo {
 		});
 	}
 
+	async reLogin() {
+		this.loginState === LoginState.STEAM_NOT_READY;
+		await this.login(this.loginDetails);
+	}
+
 	/**
 	 * This function is called when a connection to steam is established NOT when
 	 * steam is logged in.
@@ -175,20 +180,7 @@ class Csgo {
 
 	private onError(error: any, reject: any) {
 		logger.log('error', error);
-
-		// On error gets called when the client is disconnected by the server.
-		//
-		// I want to reconnect if this happens during a valid session
-		// I don't want to try to reconnect if my loginDetails don't have an auth code
-		// because then it's most likely that I've received one in my email and I have
-		// to supply that.
-		if (
-			!this.steamClient.loggedOn &&
-			this.loginDetails.auth_code !== undefined
-		) {
-			this.login(this.loginDetails);
-			return;
-		}
+		this.loginState = LoginState.LOGIN_ERROR;
 		reject();
 	}
 

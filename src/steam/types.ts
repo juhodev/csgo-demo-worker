@@ -47,6 +47,7 @@ export enum LoginState {
 	STEAM_CONNECTED = 'STEAM_CONNECTED',
 	STEAM_LOGGED_IN = 'STEAM_LOGGED_IN',
 	CSGO_READY = 'CSGO_READY',
+	LOGIN_ERROR = 'LOGIN_ERROR',
 }
 
 export type Match = {
