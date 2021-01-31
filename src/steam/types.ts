@@ -1,4 +1,5 @@
 import { Weapon } from 'demofile';
+import { Position } from './map/types';
 
 export type LoginDetails = {
 	account_name: string;
@@ -99,6 +100,7 @@ export type UnnecessaryStats = {
 	reloads: number;
 	footsteps: number;
 	bombPlants: number;
+	firingHeatmap: Position[];
 };
 
 export type WeaponFire = {

@@ -14,16 +14,9 @@ import {
 import * as fs from 'fs';
 import { logger, timer } from '..';
 import { saveProcessTime } from '../metrics/db';
-import {
-	DamageTaken,
-	ItemPickup,
-	Match,
-	Player,
-	PlayerIdentity,
-	Team,
-	UnnecessaryStats,
-	WeaponFire,
-} from './types';
+import CsgoMap from './map/csgoMap';
+import { Position } from './map/types';
+import { DamageTaken, ItemPickup, Match, Player, PlayerIdentity, Team, UnnecessaryStats, WeaponFire } from './types';
 import { changeMapName } from './utils';
 
 class Demo {
@@ -34,6 +27,7 @@ class Demo {
 	private playerIdentities: Map<string, PlayerIdentity>;
 	// This'll contain stats that no one really needs but I want to save
 	private unnecessaryStats: Map<number, UnnecessaryStats>;
+	private firingHeatmap: Map<number, CsgoMap>;
 
 	constructor(demoFilePath: string, matchTime: number) {
 		this.demoFilePath = demoFilePath;
@@ -41,6 +35,7 @@ class Demo {
 		this.matchTime = matchTime;
 		this.playerIdentities = new Map();
 		this.unnecessaryStats = new Map();
+		this.firingHeatmap = new Map();
 
 		this.onEntityCreate = this.onEntityCreate.bind(this);
 		this.onError = this.onError.bind(this);
@@ -70,19 +65,13 @@ class Demo {
 		});
 	}
 
-	private createDemoFile(
-		resolve: (match: Match) => void,
-		reject: (reason: any) => void,
-	) {
+	private createDemoFile(resolve: (match: Match) => void, reject: (reason: any) => void) {
 		this.demoFile = new demofile.DemoFile();
 
 		this.demoFile.entities.on('create', this.onEntityCreate);
 
 		this.demoFile.gameEvents.on('player_jump', this.onPlayerJump);
-		this.demoFile.gameEvents.on(
-			'player_falldamage',
-			this.onPlayerFallDamage,
-		);
+		this.demoFile.gameEvents.on('player_falldamage', this.onPlayerFallDamage);
 		this.demoFile.gameEvents.on('weapon_fire', this.onWeaponFire);
 		this.demoFile.gameEvents.on('weapon_zoom', this.onWeaponZoom);
 		this.demoFile.gameEvents.on('player_hurt', this.onPlayerHurt);
@@ -121,13 +110,13 @@ class Demo {
 		const { weapon, userid } = event;
 		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
 
-		let weaponFire: WeaponFire = stats.weaponFire.find(
-			(x) => x.weapon === weapon,
-		);
+		let weaponFire: WeaponFire = stats.weaponFire.find((x) => x.weapon === weapon);
 		if (weaponFire === undefined) {
 			weaponFire = { count: 0, weapon };
 			stats.weaponFire.push(weaponFire);
 		}
+
+		this.logPlayerLocation(userid);
 
 		weaponFire.count++;
 		stats.weaponFire;
@@ -158,9 +147,7 @@ class Demo {
 		const { userid, item, silent } = event;
 		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
 
-		let itemPickup: ItemPickup = stats.itemPickup.find(
-			(x) => x.item === item,
-		);
+		let itemPickup: ItemPickup = stats.itemPickup.find((x) => x.item === item);
 		if (itemPickup === undefined) {
 			itemPickup = { count: 0, item, silent: 0 };
 			stats.itemPickup.push(itemPickup);
@@ -184,9 +171,7 @@ class Demo {
 		const { userid, dmg_health, weapon } = event;
 		const stats: UnnecessaryStats = this.getUnnecessaryStats(userid);
 
-		let damageTaken: DamageTaken = stats.damageTaken.find(
-			(x) => x.weapon === weapon,
-		);
+		let damageTaken: DamageTaken = stats.damageTaken.find((x) => x.weapon === weapon);
 		if (damageTaken === undefined) {
 			damageTaken = { amount: 0, weapon };
 			stats.damageTaken.push(damageTaken);
@@ -212,6 +197,7 @@ class Demo {
 				itemPickup: [],
 				reloads: 0,
 				bombPlants: 0,
+				firingHeatmap: [],
 			});
 		}
 
@@ -235,9 +221,7 @@ class Demo {
 		// If the player already exists in the `players` array we should
 		// remove it and update it with the new player entity that just joined.
 		// This happens when a player leaves and rejoins the game.
-		const playerIndex: number = this.players.findIndex(
-			(p) => p.steam64Id === entity.steam64Id,
-		);
+		const playerIndex: number = this.players.findIndex((p) => p.steam64Id === entity.steam64Id);
 
 		if (playerIndex !== -1) {
 			this.players.splice(playerIndex, 1);
@@ -261,17 +245,13 @@ class Demo {
 	}
 
 	private async onEnd(resolve: (match: Match) => void) {
-		const tRounds: number = this.demoFile.teams.find(
-			(team) => team.teamName === 'TERRORIST',
-		)?.score;
+		const tRounds: number = this.demoFile.teams.find((team) => team.teamName === 'TERRORIST')?.score;
 
 		// The typescript types think that the CT team name is COUNTERTERRORIST but it's
 		// actually CT. This way I don't get an error when building. Should probably submit a PR
 		// but I'm not doing that right now.
 		const ctTeamName: string = 'CT';
-		const ctRounds: number = this.demoFile.teams.find(
-			(team) => team.teamName === ctTeamName,
-		)?.score;
+		const ctRounds: number = this.demoFile.teams.find((team) => team.teamName === ctTeamName)?.score;
 
 		// If for whatever reason I can't find both teams I should
 		// just return.
@@ -310,9 +290,14 @@ class Demo {
 			// Get the player identity from the ones that are saved when the entity is created. Sometimes
 			// the player's name and steamid3 is replaced with ones from a bot. Their steamid64 always stays the
 			// same.
-			const identity: PlayerIdentity = this.playerIdentities.get(
-				playerEntity.steam64Id,
-			);
+			const identity: PlayerIdentity = this.playerIdentities.get(playerEntity.steam64Id);
+
+			const firingHeatmap: CsgoMap = this.firingHeatmap.get(playerEntity.userId);
+			if (firingHeatmap !== undefined) {
+				const firingPositions: Position[] = firingHeatmap.save(this.demoFile.header.mapName);
+				const unnecessaryStats: UnnecessaryStats = this.unnecessaryStats.get(playerEntity.userId);
+				unnecessaryStats.firingHeatmap = firingPositions;
+			}
 
 			const player: Player = {
 				name: identity.name,
@@ -332,9 +317,7 @@ class Demo {
 						100,
 				),
 				score: playerEntity.score,
-				unnecessaryStats: this.unnecessaryStats.get(
-					playerEntity.userId,
-				),
+				unnecessaryStats: this.unnecessaryStats.get(playerEntity.userId),
 			};
 
 			teams[player.side].players.push(player);
@@ -356,6 +339,18 @@ class Demo {
 
 		logger.debug('Demo processed!');
 		resolve(match);
+	}
+
+	private logPlayerLocation(userid: number) {
+		const entity: demofile.Player = this.players.find((player) => player.userId === userid);
+		if (entity !== undefined) {
+			if (!this.firingHeatmap.has(entity.userId)) {
+				this.firingHeatmap.set(entity.userId, new CsgoMap());
+			}
+
+			const map: CsgoMap = this.firingHeatmap.get(entity.userId);
+			map.addPoint({ x: entity.position.x, y: entity.position.y });
+		}
 	}
 }
 

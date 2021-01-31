@@ -14,7 +14,7 @@ router.post('/login', async (req, res) => {
 	// Because of how I've done this I currently need to restart the server in order
 	// to re-login and obviously that's really bad design.
 	if (downloader.isInitialized()) {
-		res.status(409).json({
+		res.status(400).json({
 			error: true,
 			data: { message: 'Already initialized' },
 		});
