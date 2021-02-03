@@ -8,3 +8,9 @@ export type RadarData = {
 	originY: number;
 	scale: number;
 };
+
+export type HeatmapPosition = {
+	x: number;
+	y: number;
+	value: number;
+};

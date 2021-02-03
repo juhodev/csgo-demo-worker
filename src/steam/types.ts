@@ -1,5 +1,5 @@
 import { Weapon } from 'demofile';
-import { Position } from './map/types';
+import { HeatmapPosition, Position } from './map/types';
 
 export type LoginDetails = {
 	account_name: string;
@@ -90,6 +90,7 @@ export type PlayerIdentity = {
 };
 
 export type UnnecessaryStats = {
+	version: 1; // INCREMENT THIS ONLY WHEN THERE ARE BREAKING CHANGES
 	jumps: number;
 	fallDamage: number;
 	weaponFire: WeaponFire[];
@@ -100,7 +101,7 @@ export type UnnecessaryStats = {
 	reloads: number;
 	footsteps: number;
 	bombPlants: number;
-	firingHeatmap: Position[];
+	firingHeatmap: HeatmapPosition[];
 };
 
 export type WeaponFire = {

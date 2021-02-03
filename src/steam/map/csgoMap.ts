@@ -1,4 +1,4 @@
-import { Position, RadarData } from './types';
+import { HeatmapPosition, Position, RadarData } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -13,9 +13,39 @@ class CsgoMap {
 		this.pointsToHighlight.push(pos);
 	}
 
-	save(map: string): Position[] {
+	save(map: string): HeatmapPosition[] {
 		const radarData: RadarData = this.loadRadarData(map);
-		return this.pointsToHighlight.map((pos) => this.convertToRadarCoordinate(pos, radarData));
+		const radarCoordinates: Position[] = this.pointsToHighlight.map((pos) =>
+			this.convertToRadarCoordinate(pos, radarData),
+		);
+		return this.createHeatmap(radarCoordinates);
+	}
+
+	private createHeatmap(positions: Position[]): HeatmapPosition[] {
+		const squares: HeatmapPosition[] = [];
+
+		// This is just a magic number that makes to heatmap look decent. When coordinates are divided (and floored) by this in the initial heatmap data
+		// and then multiplied it'll stack coordinates to same positions, creating a heatmap
+		const divideBy: number = 7;
+
+		for (const pos of positions) {
+			const { x, y } = pos;
+
+			const newX: number = Math.floor(x / divideBy);
+			const newY: number = Math.floor(y / divideBy);
+
+			const old: HeatmapPosition = squares.find((heatmapPos) => heatmapPos.x === newX && heatmapPos.y === newY);
+			if (old !== undefined) {
+				old.value++;
+				continue;
+			}
+
+			squares.push({ x: newX, y: newY, value: 1 });
+		}
+
+		return squares.map((square) => {
+			return { x: square.x * divideBy, y: square.y * divideBy, value: square.value };
+		});
 	}
 
 	private convertToRadarCoordinate(pos: Position, radarData: RadarData): Position {
@@ -45,7 +75,6 @@ class CsgoMap {
 
 		const str: string = fs.readFileSync(file, 'utf-8');
 		const lines: string[] = str.split('\n');
-		debugger;
 		for (const line of lines) {
 			if (!line.includes('\t')) {
 				continue;

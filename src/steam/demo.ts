@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import { logger, timer } from '..';
 import { saveProcessTime } from '../metrics/db';
 import CsgoMap from './map/csgoMap';
-import { Position } from './map/types';
+import { HeatmapPosition, Position } from './map/types';
 import { DamageTaken, ItemPickup, Match, Player, PlayerIdentity, Team, UnnecessaryStats, WeaponFire } from './types';
 import { changeMapName } from './utils';
 
@@ -184,6 +184,7 @@ class Demo {
 	private getUnnecessaryStats(userid: number): UnnecessaryStats {
 		if (!this.unnecessaryStats.has(userid)) {
 			this.unnecessaryStats.set(userid, {
+				version: 1,
 				jumps: 0,
 				fallDamage: 0,
 				weaponFire: [],
@@ -294,7 +295,7 @@ class Demo {
 
 			const firingHeatmap: CsgoMap = this.firingHeatmap.get(playerEntity.userId);
 			if (firingHeatmap !== undefined) {
-				const firingPositions: Position[] = firingHeatmap.save(this.demoFile.header.mapName);
+				const firingPositions: HeatmapPosition[] = firingHeatmap.save(this.demoFile.header.mapName);
 				const unnecessaryStats: UnnecessaryStats = this.unnecessaryStats.get(playerEntity.userId);
 				unnecessaryStats.firingHeatmap = firingPositions;
 			}
